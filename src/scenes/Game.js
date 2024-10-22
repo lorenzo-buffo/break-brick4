@@ -1,28 +1,78 @@
-import { Scene } from 'phaser';
+import { Scene } from "phaser";
 
-export class Game extends Scene
-{
-    constructor ()
-    {
-        super('Game');
-    }
+// import class entitities
+import { Paddle } from "../entities/Paddle";
+import { Ball } from "../entities/Ball";
+import { Brick } from "../entities/Brick";
+import { WallBrick } from "../entities/WallBrick";
 
-    create ()
-    {
-        this.cameras.main.setBackgroundColor(0x00ff00);
+export class Game extends Scene {
+  constructor() {
+    super("Game");
+  }
 
-        this.add.image(512, 384, 'background').setAlpha(0.5);
+  points;
+  game_over_timeout;
+  timer_event;
 
-        this.add.text(512, 384, 'Make something fun!\nand share it with us:\nsupport@phaser.io', {
-            fontFamily: 'Arial Black', fontSize: 38, color: '#ffffff',
-            stroke: '#000000', strokeThickness: 8,
-            align: 'center'
-        }).setOrigin(0.5);
+  init(data) {
+    // Reset points
+    this.points = data.points || 0;
+    this.game_over_timeout = data.game_over_timeout || 99;
 
-        this.input.once('pointerdown', () => {
+    // launch the HUD scene
+    this.scene.launch("Hud", { remaining_time: this.game_over_timeout });
 
-            this.scene.start('GameOver');
+    // create a timmer event
+    this.timmer_event = this.time.addEvent({
+      delay: 1000,
+      loop: true,
+      callback: () => {
+        this.game_over_timeout--;
+        this.scene.get("Hud").update_timeout(this.game_over_timeout);
 
-        });
-    }
+        if (this.game_over_timeout === 0) {
+          this.scene.stop("Hud");
+          this.scene.start("GameOver");
+        }
+      },
+    });
+  }
+
+  create() {
+    // instanciar una nueva paleta.
+    // crea un nuevo objeto
+    // el this, aca, hace referencia a la escena
+    this.ball = new Ball(this, 400, 300, 10, 0xffffff, 1);
+    this.paddle = new Paddle(this, 400, 550, 300, 20, 0xffffff, 1, "ARROWS"); // ARROWS, WASD, IJKL, CURSOR
+    this.wall = new WallBrick(this, 6, 16);
+
+    // colisiones
+    this.physics.add.collider(this.paddle, this.ball);
+
+    this.physics.add.collider(
+      this.ball,
+      this.wall,
+      (ball, brick) => {
+        brick.hit();
+      },
+      null,
+      this
+    );
+
+    //colision de la pelota con el limite inferior
+    this.physics.world.on("worldbounds", (body, up, down, left, right) => {
+      console.log("worldbounds");
+      if (down) {
+        console.log("hit bottom");
+        this.scene.stop("Hud");
+        this.scene.start("GameOver");
+      }
+    });
+  }
+
+  update_points(points) {
+    this.points += points;
+    this.scene.get("Hud").update_points(this.points);
+  }
 }
